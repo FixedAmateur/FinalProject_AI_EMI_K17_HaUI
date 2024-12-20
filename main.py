@@ -140,30 +140,49 @@ print("Model created and trained!")
 df_y_predicted = pd.DataFrame(np.round(lr_model.predict(df_x_test), 2), columns=["Predicted Performance Index"])
 save_df(df_y_predicted,f"{evaluation_dir}/{split_dir}/Prediction_of_{file_name}_split_features","csv" )
 
-# 4.4. Evaluate model
+# 4.5. Get regression equation
+def regression_equation(lr_model, features):
+    coefficients = lr_model.coef_
+    intercept = lr_model.intercept_
+    equation = f"y = {np.round(intercept, 4)}"
+    for coef, feature in zip(coefficients, features):
+        equation += f" + ({np.round(coef, 4)})*({feature})"
+    return equation
+
+regression_equation = regression_equation(lr_model, features)
+# 4.5. Evaluate model
 
 os.makedirs(evaluation_dir, exist_ok=True)
-def evaluate_lr_model(lr_model, evaluation_dir, x_test, y_test, y_pred):
+def evaluate_lr_model(lr_model, regression_equation ,x_test, y_test, y_pred):
+    rmse = np.round(np.sqrt(metrics.mean_squared_error(y_test, y_pred)), 4)
+    r2 = np.round(lr_model.score(x_test, y_test), 4)
+
     evaluation = {
-        "RMSE" : np.round(np.sqrt(metrics.mean_squared_error(y_test, y_pred)), 4),
-        "R2" :  np.round(lr_model.score(x_test, y_test), 4)
+        "RMSE": rmse,
+        "R2": r2,
+        "Regression Equation": regression_equation,
     }
-    df_evaluation = pd.DataFrame(evaluation.items()).transpose()
-    save_df(df_evaluation, f"{evaluation_dir}/model_evaluation", "csv")
+
+    df_evaluation = pd.DataFrame(evaluation.items(), columns=["Metric", "Value"]).transpose()
+
+    df_evaluation.columns = df_evaluation.iloc[0]
+    df_evaluation = df_evaluation.drop(df_evaluation.index[0])
     return df_evaluation
 
-df_evaluation = evaluate_lr_model(lr_model, "Model evaluation", df_x_test, df_y_test, df_y_predicted)
+df_evaluation = evaluate_lr_model(lr_model, regression_equation, df_x_test, df_y_test, df_y_predicted)
+df_evaluation["Regression Equation"] = regression_equation
 print("Model evaluation:\n",df_evaluation)
+save_df(df_evaluation, f"{evaluation_dir}/model_evaluation", "csv")
 
 # 4.5. Draw scatterplot
-def scatter(x_test, y_test, y_prediction):
+def scatter(x_test, y_test):
     scatters = []
     target = y_test.name
     for column in x_test:
         fig = plt.figure(figsize=(10,8))
         plt.scatter(x_test[column], y_test, color="blue", label="Actual")
         #plt.plot(x_test[column], y_prediction, color="red", label="Predicted")
-        plt.title(f"Collaration between {column} and {target}")
+        plt.title(f"Correlation between {column} and {target}")
         plt.xlabel(column)
         plt.ylabel(target)
         plt.legend()
@@ -172,7 +191,7 @@ def scatter(x_test, y_test, y_prediction):
     return scatters
 
 os.makedirs(f"{evaluation_dir}/Scatter", exist_ok=True)
-scatters = scatter(df_x_test, df_y_test, df_y_predicted)
+scatters = scatter(df_x_test, df_y_test)
 for fig in scatters:
     fig.savefig(f"{evaluation_dir}/Scatter/{fig.axes[0].get_title()}.png")
 
